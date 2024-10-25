@@ -6,3 +6,4 @@ class Agent:
         self.pos = pos
 
         #### AFAOJDAWODKAOWD ####
+        # asha
