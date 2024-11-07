@@ -93,6 +93,10 @@ class Environment:
         else:
             return 0
 
+        # checking for out of bounds
+        if new_pos[0] < 0 or new_pos[0] >= self.grid_size or new_pos[1] < 0 or new_pos[1] >= self.grid_size:
+            return 0
+
         # checking for obstacles
         if self.grid[new_pos[0]][new_pos[1]] == 1:
             return 0
