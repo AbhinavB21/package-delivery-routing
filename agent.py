@@ -5,5 +5,8 @@ class Agent:
         self.id = id
         self.pos = pos
 
-        #### AFAOJDAWODKAOWD ####
-        # asha
+    def get_id(self):
+        return self.id
+    
+    def get_pos(self):
+        return self.pos
