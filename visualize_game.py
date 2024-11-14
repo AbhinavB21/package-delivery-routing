@@ -72,5 +72,5 @@ def run_visualization(env):
 # run viz with env from environment.py
 if __name__ == "__main__":
     # adjust num_agents, grid_size, num_obstacles here
-    env = Environment(num_agents=2, grid_size=5, num_obstacles=2)
-    run_visualization(env)
+    game = Environment(num_agents=2, grid_size=5, num_obstacles=2)
+    run_visualization(game)
