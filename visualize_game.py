@@ -15,6 +15,18 @@ BLUE = (255, 0, 0)  # For packages
 GREEN = (0, 0, 255)  # For agents
 RED = (255, 0, 0)  # For obstacles 
 
+# Add these new colors
+AGENT_COLORS = [
+    (0, 255, 0),     # Green
+    (0, 200, 100),   # Teal
+    (100, 255, 100)  # Light green
+]
+AGENT_WITH_PACKAGE_COLORS = [
+    (0, 150, 0),     # Dark green
+    (0, 100, 50),    # Dark teal
+    (50, 150, 50)    # Dark light green
+]
+
 # initialize pygame
 pygame.init()
 
@@ -26,20 +38,39 @@ def draw_grid(screen, state, env):
             rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
             pygame.draw.rect(screen, BLACK, rect, 1)
             
-            # Draw goal room
+            # Draw obstacles
+            if (x, y) in env.obstacles:
+                pygame.draw.rect(screen, RED, rect)  # Fill obstacle cells with red
+            
+            # Draw goal room with transparency
             if (x, y) == env.goal_room:
-                pygame.draw.rect(screen, (255, 215, 0), rect)  # Gold color for goal
+                s = pygame.Surface((CELL_SIZE, CELL_SIZE))
+                s.set_alpha(128)
+                s.fill((255, 215, 0))
+                screen.blit(s, (x * CELL_SIZE, y * CELL_SIZE))
             
-            # Draw agents (plural)
-            for i, agent_pos in enumerate(state['agent_positions']):
-                if (x, y) == agent_pos:
-                    color = GREEN if state['package_picked'][i] else (0, 255, 0)
-                    pygame.draw.rect(screen, color, rect)
-            
-            # Draw packages (plural)
+            # Draw packages with circles
             for package_pos in state['package_positions']:
                 if (x, y) == package_pos:
-                    pygame.draw.rect(screen, BLUE, rect)
+                    center = (x * CELL_SIZE + CELL_SIZE//2, y * CELL_SIZE + CELL_SIZE//2)
+                    pygame.draw.circle(screen, BLUE, center, CELL_SIZE//3)
+            
+            # Draw agents with different colors and shapes
+            for i, agent_pos in enumerate(state['agent_positions']):
+                if (x, y) == agent_pos:
+                    agent_rect = pygame.Rect(
+                        x * CELL_SIZE + 5, 
+                        y * CELL_SIZE + 5, 
+                        CELL_SIZE - 10, 
+                        CELL_SIZE - 10
+                    )
+                    color = AGENT_WITH_PACKAGE_COLORS[i] if state['package_picked'][i] else AGENT_COLORS[i]
+                    pygame.draw.rect(screen, color, agent_rect)
+                    # Add agent number
+                    font = pygame.font.Font(None, 36)
+                    text = font.render(str(i+1), True, BLACK)
+                    text_rect = text.get_rect(center=(x * CELL_SIZE + CELL_SIZE//2, y * CELL_SIZE + CELL_SIZE//2))
+                    screen.blit(text, text_rect)
 
 # main loop
 def run_visualization(env, q_table):
@@ -49,8 +80,11 @@ def run_visualization(env, q_table):
     screen = pygame.display.set_mode((screen_size, screen_size))
     pygame.display.set_caption("Multi-Agent Package Delivery Simulation")
 
-    state = env.reset()
+    state, _, _ = env.reset()
     done = False
+    
+    FPS = 2
+    clock = pygame.time.Clock()
     
     while running:
         for event in pygame.event.get():
@@ -58,28 +92,37 @@ def run_visualization(env, q_table):
                 running = False
 
         if not done:
-            # Get actions for all agents
             actions = []
             for agent_id in range(env.num_agents):
                 state_hash = hash_state(state, agent_id)
-                if state_hash in q_table:
-                    agent_action = np.argmax(q_table[state_hash])
+                
+                # Debug prints
+                print(f"\nAgent {agent_id}:")
+                print(f"Current position: {state['agent_positions'][agent_id]}")
+                print(f"State hash: {state_hash}")
+                if agent_id in q_table and state_hash in q_table[agent_id]:
+                    q_values = q_table[agent_id][state_hash]
+                    print(f"Q-values: {q_values}")
+                    print(f"Available actions: {env.actions}")
+                    agent_action = np.argmax(q_values)
+                    print(f"Chosen action: {env.actions[agent_action]}")
                     actions.append(agent_action)
                 else:
-                    actions.append(0)  # Default action if state not in q_table
+                    print("State not found in Q-table")
+                    actions.append(0)
             
-            # Take the combined action
-            state, reward, done = env.step(actions)
+            # Take actions for each agent
+            for agent_id, action in enumerate(actions):
+                next_state, reward, done, info = env.step(action, agent_id)
+                print(f"Agent {agent_id} took action {env.actions[action]}, got reward {reward}")
+                if done:
+                    break
+            
+            state = next_state
 
         draw_grid(screen, state, env)
         pygame.display.flip()
-        time.sleep(0.5)  # Add delay to make visualization easier to follow
-        
-        if done:
-            time.sleep(2)  # Pause at the end
-            running = False
-
-    pygame.quit()
+        clock.tick(FPS)
 
 # run viz with env from environment.py
 if __name__ == "__main__":

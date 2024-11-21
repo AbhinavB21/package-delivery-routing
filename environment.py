@@ -30,10 +30,15 @@ class PackageEnv(gym.Env):
     def reset(self):
         available_positions = [(i, j) for i, j in self.rooms if (i, j) != self.goal_room]
 
-        total = self.num_agents + self.num_packages
+        # Sample positions for agents, packages, AND obstacles
+        total = self.num_agents + self.num_packages + 2  # +2 for obstacles
         all_positions = random.sample(available_positions, total)
-        self.agent_positions = random.sample(available_positions, self.num_agents)
-        self.package_positions = all_positions[self.num_agents:]
+        
+        # Distribute the positions
+        self.agent_positions = all_positions[:self.num_agents]
+        self.package_positions = all_positions[self.num_agents:self.num_agents + self.num_packages]
+        self.obstacles = all_positions[self.num_agents + self.num_packages:]  # Last 2 positions become obstacles
+
         self.package_picked = [False] * self.num_agents
         self.fuel_consumed = [1000] * self.num_agents
 
@@ -59,20 +64,25 @@ class PackageEnv(gym.Env):
         x, y = current_pos
 
         directions = {
-            'UP': (x - 1, y),
-            'DOWN': (x + 1, y),
-            'LEFT': (x, y - 1),
-            'RIGHT': (x, y + 1)
+            'LEFT': (x - 1, y),
+            'RIGHT': (x + 1, y),
+            'UP': (x, y - 1),
+            'DOWN': (x, y + 1)
         }
 
         new_pos = directions.get(action, self.current_state['agent_positions'][agent_id])
 
-        if 0 <= new_pos[0] < self.grid_size and 0 <= new_pos[1] < self.grid_size:
+        # Check if move is valid (within bounds AND not into obstacle)
+        if (0 <= new_pos[0] < self.grid_size and 
+            0 <= new_pos[1] < self.grid_size and 
+            new_pos not in self.obstacles):
             self.current_state['agent_positions'][agent_id] = new_pos
             self.current_state['fuel_consumed'][agent_id] -= 1
             return f"Moved to {self.current_state['agent_positions']}", self.rewards[action]
         else:
-            return "Out of bounds", 0
+            # Stay in current position if move is invalid
+            self.current_state['fuel_consumed'][agent_id] -= 1  # Still consume fuel for attempted move
+            return "Cannot move: Obstacle or boundary in the way", self.rewards[action]
     
     def pickup_package(self, agent_id):
         if self.current_state['agent_positions'][agent_id] == self.current_state['package_positions'][agent_id]:
