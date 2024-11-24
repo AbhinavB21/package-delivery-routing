@@ -3,11 +3,11 @@ import numpy as np
 import random
 
 class PackageEnv(gym.Env):
-    def __init__(self, num_agents, num_packages):
+    def __init__(self, num_agents):
         super(PackageEnv, self).__init__()
 
         self.num_agents = num_agents
-        self.num_packages = num_packages
+        self.num_packages = num_agents
         self.grid_size = 10
         self.roads = self.rooms = [(i, j) for i in range(self.grid_size) for j in range(self.grid_size)]
         self.goal_room = (self.grid_size - 1, self.grid_size - 1)
@@ -40,7 +40,7 @@ class PackageEnv(gym.Env):
         self.obstacles = all_positions[self.num_agents + self.num_packages:]  # Last 2 positions become obstacles
 
         self.package_picked = [False] * self.num_agents
-        self.fuel_consumed = [1000] * self.num_agents
+        self.fuel_consumed = [100] * self.num_agents
 
         self.current_state = {
             'agent_positions': self.agent_positions,
@@ -108,10 +108,7 @@ class PackageEnv(gym.Env):
             return "Invalid action", 0
     
     def step(self, action, agent_id):
-        if (isinstance(action, str)):
-            action = self.actions.index(action)
-        
-        action_name = self.actions[action]
+        action_name = action
         result, reward = self.play_turn(action_name, agent_id)
         done = False
         terminal_state = self.is_terminal(agent_id)

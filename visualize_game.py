@@ -96,25 +96,16 @@ def run_visualization(env, q_table):
             for agent_id in range(env.num_agents):
                 state_hash = hash_state(state, agent_id)
                 
-                # Debug prints
-                print(f"\nAgent {agent_id}:")
-                print(f"Current position: {state['agent_positions'][agent_id]}")
-                print(f"State hash: {state_hash}")
                 if agent_id in q_table and state_hash in q_table[agent_id]:
                     q_values = q_table[agent_id][state_hash]
-                    print(f"Q-values: {q_values}")
-                    print(f"Available actions: {env.actions}")
                     agent_action = np.argmax(q_values)
-                    print(f"Chosen action: {env.actions[agent_action]}")
                     actions.append(agent_action)
                 else:
-                    print("State not found in Q-table")
                     actions.append(0)
             
             # Take actions for each agent
             for agent_id, action in enumerate(actions):
                 next_state, reward, done, info = env.step(action, agent_id)
-                print(f"Agent {agent_id} took action {env.actions[action]}, got reward {reward}")
                 if done:
                     break
             
