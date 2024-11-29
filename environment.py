@@ -8,7 +8,7 @@ class PackageEnv(gym.Env):
 
         self.num_agents = num_agents
         self.num_packages = num_agents
-        self.grid_size = 10
+        self.grid_size = 5
         self.roads = self.rooms = [(i, j) for i in range(self.grid_size) for j in range(self.grid_size)]
         self.goal_room = (self.grid_size - 1, self.grid_size - 1)
 

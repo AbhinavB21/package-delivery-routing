@@ -5,7 +5,7 @@ from environment import PackageEnv
 import pickle
 import matplotlib.pyplot as plt
 
-env = PackageEnv(num_agents=2)
+env = PackageEnv(num_agents=3)
 
 def hash_state(state, agent_id):
     x, y = state['agent_positions'][agent_id]
@@ -32,7 +32,7 @@ def calculate_shared_q_value(Q_table, state, action, num_agents):
     return shared_q / count if count > 0 else 0 #ChatGPT helped with this
 
 def Q_learning(agent_id, Q_table, num_updates, epsilon, gamma, learning_rate):
-    q_learning_env = PackageEnv(num_agents=2)
+    q_learning_env = PackageEnv(num_agents=3)
     state, _, _ = q_learning_env.reset()
     prev_state = hash_state(state, agent_id)
     done = False
@@ -130,7 +130,7 @@ def q_learning_multi_agent(num_episodes, num_agents, gamma=0.99, epsilon=1.0,
 if __name__ == "__main__":
     Q_table = q_learning_multi_agent(
         num_episodes=10000,
-        num_agents=2,
+        num_agents=3,
         gamma=0.99,
         epsilon=1.0,
         decay_rate=0.9995,
