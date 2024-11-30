@@ -1,161 +1,133 @@
+import gym
 import numpy as np
-from agent import Agent
-from package import Package
 import random
-import copy
 
-class Environment:
-    def __init__(self, num_agents, grid_size, num_obstacles):
+class PackageEnv(gym.Env):
+    def __init__(self, num_agents):
+        super(PackageEnv, self).__init__()
+
         self.num_agents = num_agents
-        self.grid_size = grid_size  
         self.num_packages = num_agents
-        self.num_obstacles = num_obstacles
-        self.start_positions = []  
-        self.obstacles = []
-        self.pickup_location = (0, 0)
-        self.drop_location = (self.grid_size - 1, self.grid_size - 1)
-        self.actions = ['UP', 'DOWN', 'LEFT', 'RIGHT', 'PICKUP', 'DROP']
-        self.int_to_actions = {0: 'UP', 1: 'DOWN', 2: 'LEFT', 3: 'RIGHT', 4: 'PICKUP', 5: 'DROP'}
-        self.move_penalty = -1
+        self.grid_size = 5
+        self.roads = self.rooms = [(i, j) for i in range(self.grid_size) for j in range(self.grid_size)]
+        self.goal_room = (self.grid_size - 1, self.grid_size - 1)
+
         self.rewards = {
-            'UP': self.move_penalty,
-            'DOWN': self.move_penalty,
-            'LEFT': self.move_penalty,
-            'RIGHT': self.move_penalty,
-            'PICKUP': (self.grid_size * self.grid_size) * 2,
-            'DROP': (self.grid_size * self.grid_size) * 5,
+            'UP': -1,
+            'DOWN': -1,
+            'LEFT': -1,
+            'RIGHT': -1,
+            'PICKUP': 5000,
+            'DROP': 10000,
             'EMPTY': -10000
         }
-        self.package_picked = False
-        self.fuel = self.grid_size * self.grid_size * 30
-        self.total_reward = 0
-        self.done = False
-        self.agents = []
-        self.start_positions = []
-        self.packages = None
-        self.current_state = None
+
+        # Actions
+        self.actions = ['UP', 'DOWN', 'LEFT', 'RIGHT', 'PICKUP', 'DROP']
+
         self.reset()
 
     def reset(self):
-        self.start_positions = []
-        self.obstacles = []
-        self.grid = self._create_grid()
-        self.agents = self._add_agents()
-        self.packages = self._assign_package()
+        available_positions = [(i, j) for i, j in self.rooms if (i, j) != self.goal_room]
+
+        # Sample positions for agents, packages, AND obstacles
+        total = self.num_agents + self.num_packages + 2  # +2 for obstacles
+        all_positions = random.sample(available_positions, total)
         
-        if not self.agents:  # Check if agents list is empty
-            raise ValueError("No agents were created!")
-        
-        start_pos = self.agents[0].pos
+        # Distribute the positions
+        self.agent_positions = all_positions[:self.num_agents]
+        self.package_positions = all_positions[self.num_agents:self.num_agents + self.num_packages]
+        self.obstacles = all_positions[self.num_agents + self.num_packages:]  # Last 2 positions become obstacles
+
+        self.package_picked = [False] * self.num_agents
+        self.fuel_consumed = [100] * self.num_agents
+
         self.current_state = {
-            'driver_position': start_pos,
-            'package_picked': False
+            'agent_positions': self.agent_positions,
+            'package_positions': self.package_positions,
+            'package_picked': self.package_picked,
+            'fuel_consumed': self.fuel_consumed
         }
-        self.fuel = self.grid_size * self.grid_size * 30
-        self.pickup_location = self._random_empty_position()
-        while True:
-            self.drop_location = self._random_empty_position()
-            if self.drop_location != self.pickup_location:
-                break
-        self.done = False
-        self.total_reward = 0
-        return self.current_state, self.total_reward, self.done
 
-    def step(self, action):
-        if self.fuel != 0:
-            reward = self._driver_turn(action)
+        return self.current_state, 0, False
+
+    def is_terminal(self, agent_id):
+        if self.current_state['agent_positions'][agent_id] == self.goal_room:
+            if self.current_state['package_picked'][agent_id]:
+                return 'DROP'
+        if self.current_state['fuel_consumed'][agent_id] <= 0:
+            return 'EMPTY'
+        return False
+
+    def move_agent(self, agent_id, action):
+        current_pos = self.current_state['agent_positions'][agent_id]
+        x, y = current_pos
+
+        directions = {
+            'LEFT': (x - 1, y),
+            'RIGHT': (x + 1, y),
+            'UP': (x, y - 1),
+            'DOWN': (x, y + 1)
+        }
+
+        new_pos = directions.get(action, self.current_state['agent_positions'][agent_id])
+
+        # Check if move is valid (within bounds AND not into obstacle)
+        if (0 <= new_pos[0] < self.grid_size and 
+            0 <= new_pos[1] < self.grid_size and 
+            new_pos not in self.obstacles):
+            self.current_state['agent_positions'][agent_id] = new_pos
+            self.current_state['fuel_consumed'][agent_id] -= 1
+            return f"Moved to {self.current_state['agent_positions']}", self.rewards[action]
         else:
-            reward = self.rewards['EMPTY']
-            self.done = True
-        self.total_reward += reward
-        return self.current_state, reward, self.done
+            # Stay in current position if move is invalid
+            self.current_state['fuel_consumed'][agent_id] -= 1  # Still consume fuel for attempted move
+            return "Cannot move: Obstacle or boundary in the way", self.rewards[action]
+    
+    def pickup_package(self, agent_id):
+        if self.current_state['agent_positions'][agent_id] == self.current_state['package_positions'][agent_id]:
+            if not self.current_state['package_picked'][agent_id]:
+                self.current_state['package_picked'][agent_id] = True
+                return "Picked up package", self.rewards['PICKUP']
+        return "No package to pickup", 0
 
-    def _driver_turn(self, action):
+    def drop_package(self, agent_id):
+        if self.current_state['package_picked'][agent_id]:
+            if self.current_state['agent_positions'][agent_id] == self.goal_room:
+                return "Dropped package", self.rewards['DROP']
+        return "No package to drop", 0
+
+    def play_turn(self, action, agent_id):
         if action in ['UP', 'DOWN', 'LEFT', 'RIGHT']:
-            return self._move_driver(action)
+            return self.move_agent(agent_id, action)
         elif action == 'PICKUP':
-            return self._pickup_package()
+            return self.pickup_package(agent_id)
         elif action == 'DROP':
-            return self._drop_package()
+            return self.drop_package(agent_id)
         else:
-            return 0
-
-    def _move_driver(self, action):
-        x, y = self.current_state['driver_position']
-        if action == 'UP':
-            new_pos = (x - 1, y)
-        elif action == 'DOWN':
-            new_pos = (x + 1, y)
-        elif action == 'LEFT':
-            new_pos = (x, y - 1)
-        elif action == 'RIGHT':
-            new_pos = (x, y + 1)
-        else:
-            return 0
-
-        if new_pos[0] < 0 or new_pos[0] >= self.grid_size or new_pos[1] < 0 or new_pos[1] >= self.grid_size:
-            return 0
-        if self.grid[new_pos[0]][new_pos[1]] == 1:
-            return 0
-
-        self.current_state['driver_position'] = new_pos
-        self.fuel -= 1
-        return self.move_penalty
-
-    def _pickup_package(self):
-        if self.current_state['driver_position'] == self.pickup_location:
-            self.current_state['package_picked'] = True
-            return self.rewards['PICKUP']
-        return 0
-
-    def _drop_package(self):
-        if self.current_state['driver_position'] == self.drop_location:
-            self.current_state['package_picked'] = False
-            self.done = True
-            return self.rewards['DROP']
-        return 0
-
-    def _create_grid(self):
-        grid = np.zeros((self.grid_size, self.grid_size), dtype=object)
-        for _ in range(self.num_obstacles):
-            x, y = self._random_empty_position(grid)
-            grid[x][y] = 1
-            self.obstacles.append((x, y)) 
-        return grid
+            return "Invalid action", 0
     
-    def _add_agents(self):
-        self.agents = []  # Clear existing agents
-        for i in range(self.num_agents):
-            start_pos = self._random_empty_position()
-            self.start_positions.append(start_pos)
-            new_agent = Agent(id=i, pos=start_pos)  
-            self.agents.append(new_agent)
-        return self.agents
+    def step(self, action, agent_id):
+        action_name = action
+        result, reward = self.play_turn(action_name, agent_id)
+        done = False
+        terminal_state = self.is_terminal(agent_id)
+        if terminal_state == "DROP":
+            done = True
+            reward += self.rewards['DROP']
+            result += f" You've dropped the package! {self.rewards['DROP']} points!"
+        elif terminal_state == "EMPTY":
+            done = True
+            reward += self.rewards['EMPTY']
+            result += f" You've run out of fuel! {self.rewards['EMPTY']} points!"
+
+        info = {'result': result, 'action': action_name}
+        return self.current_state, reward, done, info
     
-    def _random_empty_position(self, grid=None):
-        while True:
-            x, y = np.random.randint(0, self.grid_size, size=2)
-            if ((grid is None or grid[x][y] == 0)
-                    and (x, y) not in self.start_positions
-                    and (x, y) not in self.obstacles):
-                return x, y
+    def render(self, mode='human'):
+        """Renders the current state"""
+        print(f"Current state: {self.current_state}")
 
-    def _assign_package(self):
-        packages = []
-        count = 0
-        agent_list = self.agents.copy()  # Create a copy to avoid modifying original
-        
-        # Make sure we don't try to assign more packages than we have agents
-        num_packages = min(self.num_packages, len(agent_list))
-        
-        for i in range(num_packages):
-            if not agent_list:  # Check if we have any agents left
-                break
-            random_agent = random.choice(agent_list)
-            package = Package(count, random_agent.id)
-            agent_list.remove(random_agent)
-            packages.append(package)
-            count += 1
-        
-        return packages
-
+    def close(self):
+        """Performs cleanup"""
+        pass
