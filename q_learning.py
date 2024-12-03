@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 env = PackageEnv(num_agents=3)
 
+# Creating unique hash states based on agent position, packages, and other agent states.
 def hash_state(state, agent_id):
     x, y = state['agent_positions'][agent_id]
     package_picked = int(state['package_picked'][agent_id])
@@ -18,10 +19,12 @@ def hash_state(state, agent_id):
             package_picked * env.grid_size * env.grid_size +
             px * env.grid_size + py) * env.grid_size + gx * env.grid_size + gy #ChatGPT helped with this formula
 
+# Calculating the ETA for Q-Learning formula
 def calculate_eta(num_updates, state, action):
     base_learning_rate = 0.2
-    return base_learning_rate / (1 + num_updates[state][action] * 0.1)
+    return base_learning_rate / (1 + num_updates[state][action] * 0.1) # ChatGPT helped me with this function
 
+# Calculating shared value for each individual agent.
 def calculate_shared_q_value(Q_table, state, action, num_agents):
     shared_q = 0
     count = 0
@@ -31,7 +34,8 @@ def calculate_shared_q_value(Q_table, state, action, num_agents):
             count += 1
     return shared_q / count if count > 0 else 0 #ChatGPT helped with this
 
-def Q_learning(agent_id, Q_table, num_updates, epsilon, gamma, learning_rate):
+# Individual Q-learning for a single agent
+def Q_learning(agent_id, Q_table, num_updates, epsilon, gamma, learning_rate): #ChatGPT helped with this function
     q_learning_env = PackageEnv(num_agents=3)
     state, _, _ = q_learning_env.reset()
     prev_state = hash_state(state, agent_id)
@@ -64,7 +68,7 @@ def Q_learning(agent_id, Q_table, num_updates, epsilon, gamma, learning_rate):
         shared_q = calculate_shared_q_value(Q_table, prev_state, action_idx, q_learning_env.num_agents)
         alpha = 0.5 
         target = reward + (0 if done else gamma * ((1-alpha) * Q_table[agent_id][curr_state][next_best_action] + 
-                                                 alpha * shared_q)) #ChatGPT helped with this line
+                                                 alpha * shared_q)) #ChatGPT helped with this
         current_q = Q_table[agent_id][prev_state][action_idx]
         Q_table[agent_id][prev_state][action_idx] = current_q + eta * (target - current_q)
         
@@ -92,8 +96,9 @@ def plot_rewards(agent_rewards, episode_numbers, window_size=50): #ChatGPT helpe
     plt.savefig('agent_rewards.png')
     plt.close()
 
+# Multi-agent Q-learning that runs q-learning for each individual agent concurrently
 def q_learning_multi_agent(num_episodes, num_agents, gamma=0.99, epsilon=1.0, 
-                          decay_rate=0.9995, learning_rate=0.1):
+                          decay_rate=0.9995, learning_rate=0.1): #ChatGPT helped with this function
     Q_table = [{} for _ in range(num_agents)]
     num_updates = [{} for _ in range(num_agents)]
     agent_rewards = [[] for _ in range(num_agents)]

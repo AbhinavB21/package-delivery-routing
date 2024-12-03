@@ -6,7 +6,7 @@ import random
 import time
 
 # used some of the code from old PAs to help with the visualization
-# used genai and documentation for debugging and readability
+# used GenAI and documentation for debugging and readability
 # visualization is based of .pickle (or .pkl) file that contains the Q-tables
 # so don't run expecting it will show you irl simulation of q-table learning and shared q-table
 # instead it will show you the visualization of the game with the shared q-table already computed

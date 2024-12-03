@@ -2,6 +2,9 @@ import gym
 import numpy as np
 import random
 
+# used some of the code from old PAs to help with the visualization
+# used GenAI and documentation for debugging and readability
+
 class PackageEnv(gym.Env):
     def __init__(self, num_agents):
         super(PackageEnv, self).__init__()
@@ -27,6 +30,7 @@ class PackageEnv(gym.Env):
 
         self.reset()
 
+    # Resets all agents and packages to random positions
     def reset(self):
         available_positions = [(i, j) for i, j in self.rooms if (i, j) != self.goal_room]
 
@@ -51,6 +55,7 @@ class PackageEnv(gym.Env):
 
         return self.current_state, 0, False
 
+    # Checks to see if agent has finished its goal
     def is_terminal(self, agent_id):
         if self.current_state['agent_positions'][agent_id] == self.goal_room:
             if self.current_state['package_picked'][agent_id]:
@@ -59,6 +64,7 @@ class PackageEnv(gym.Env):
             return 'EMPTY'
         return False
 
+    # Moves agents with accordance to proper movement rules.
     def move_agent(self, agent_id, action):
         current_pos = self.current_state['agent_positions'][agent_id]
         x, y = current_pos
@@ -84,6 +90,7 @@ class PackageEnv(gym.Env):
             self.current_state['fuel_consumed'][agent_id] -= 1  # Still consume fuel for attempted move
             return "Cannot move: Obstacle or boundary in the way", self.rewards[action]
     
+    # Pickup package
     def pickup_package(self, agent_id):
         if self.current_state['agent_positions'][agent_id] == self.current_state['package_positions'][agent_id]:
             if not self.current_state['package_picked'][agent_id]:
@@ -91,12 +98,14 @@ class PackageEnv(gym.Env):
                 return "Picked up package", self.rewards['PICKUP']
         return "No package to pickup", 0
 
+    # Drop package
     def drop_package(self, agent_id):
         if self.current_state['package_picked'][agent_id]:
             if self.current_state['agent_positions'][agent_id] == self.goal_room:
                 return "Dropped package", self.rewards['DROP']
         return "No package to drop", 0
 
+    # Gets the result of each individual action for an agent
     def play_turn(self, action, agent_id):
         if action in ['UP', 'DOWN', 'LEFT', 'RIGHT']:
             return self.move_agent(agent_id, action)
@@ -107,6 +116,7 @@ class PackageEnv(gym.Env):
         else:
             return "Invalid action", 0
     
+    # Performs the action and calculates the reward
     def step(self, action, agent_id):
         action_name = action
         result, reward = self.play_turn(action_name, agent_id)
@@ -123,11 +133,3 @@ class PackageEnv(gym.Env):
 
         info = {'result': result, 'action': action_name}
         return self.current_state, reward, done, info
-    
-    def render(self, mode='human'):
-        """Renders the current state"""
-        print(f"Current state: {self.current_state}")
-
-    def close(self):
-        """Performs cleanup"""
-        pass
