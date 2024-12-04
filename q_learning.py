@@ -5,6 +5,8 @@ from environment import PackageEnv
 import pickle
 import matplotlib.pyplot as plt
 
+# GenAI was used for this file for code debugging and general assistance
+
 env = PackageEnv(num_agents=3)
 
 # Creating unique hash states based on agent position, packages, and other agent states.
